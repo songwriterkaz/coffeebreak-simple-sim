@@ -28,7 +28,7 @@ peer.on('disconnected',function(){st('Reconnecting');setTimeout(function(){try{p
 peer.on('error',function(e){if(e.type=='unavailable-id'){st('Reconnecting');setTimeout(start,4000+Math.min(tries++,5)*2000)}else if(e.type=='peer-unavailable'){st(target+' is offline. Waiting');ntfy(target)}else if(e.type=='network'||e.type=='server-error'||e.type=='socket-error'){st('Reconnecting');setTimeout(start,3000)}})}
 function link(){if(!target||!peer||!peer.open)return;if(conn&&conn.open&&conn.peer==P+target)return;bind(peer.connect(P+target,{reliable:true}))}
 function bind(c){c.on('open',function(){conn=c;var n=c.peer.slice(P.length);save(n);if(!target){target=n;fill()}st('Connected to '+n,true)});
-c.on('close',function(){if(conn==c){conn=null;st('Reconnecting')}});c.on('error',function(){})}
+c.on('data',function(d){if(d=='bye'&&mcall){try{mcall.close()}catch(e){}endUI()}});c.on('close',function(){if(conn==c){conn=null;st('Reconnecting')}});c.on('error',function(){})}
 setInterval(function(){if(peer&&peer.disconnected&&!peer.destroyed)try{peer.reconnect()}catch(e){};if(target&&!(conn&&conn.open))link()},6000);
 // backup pairing over ntfy.sh
 function ntfy(n){fetch('https://ntfy.sh/cbsimple-'+n,{method:'POST',body:me}).catch(function(){})}
@@ -37,7 +37,7 @@ function mic(){if(stream)return Promise.resolve(stream);return navigator.mediaDe
 function media(c){mcall=c;c.on('stream',function(s){var a=$('#au');a.srcObject=s;a.play().catch(function(){});st('On call with '+c.peer.slice(P.length),true)});
 c.on('close',endUI);c.on('error',endUI);$('#call').textContent='END';$('#call').classList.add('end');$('#call').classList.remove('hide');$('#ans').hidden=true}
 function endUI(){mcall=null;ring(false);$('#call').textContent='CALL';$('#call').classList.remove('end','hide');$('#ans').hidden=true;st(conn&&conn.open?'Connected to '+target:'Online. Ready',true)}
-$('#call').onclick=function(){if(mcall){mcall.close();endUI();return}target=target||$('#who').value;if(!target){st('Share your link first');return}
+$('#call').onclick=function(){if(mcall){try{conn&&conn.open&&conn.send('bye')}catch(e){}mcall.close();endUI();return}target=target||$('#who').value;if(!target){st('Share your link first');return}
 if(!peer||!peer.open){st('Still going online');return}st('Calling '+target);mic().then(function(s){media(peer.call(P+target,s))}).catch(function(){st('Allow the microphone')})};
 $('#ans').onclick=function(){ring(false);var c=mcall;mic().then(function(s){c.answer(s);media(c)}).catch(function(){st('Allow the microphone')})};
 $('#mute').onclick=function(){muted=!muted;if(stream)stream.getAudioTracks().forEach(function(t){t.enabled=!muted&&!paused});this.classList.toggle('on',muted);this.textContent=muted?'Unmute':'Mute'};
